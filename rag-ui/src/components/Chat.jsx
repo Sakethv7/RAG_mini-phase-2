@@ -1,13 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
-/**
- * Option A: Backend-only on Render
- * Change this ONLY if backend URL changes
- */
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE =
+  import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
@@ -15,42 +11,34 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef(null);
 
-  // Auto-scroll on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   async function send() {
-    const question = input.trim();
-    if (!question || loading) return;
+    if (!input.trim() || loading) return;
 
-    const userMsg = { role: "user", content: question };
+    const userMsg = { role: "user", content: input };
     setMessages((m) => [...m, userMsg]);
     setInput("");
     setLoading(true);
 
     try {
       const res = await axios.post(`${API_BASE}/ask`, {
-        question,
+        question: userMsg.content,
       });
 
-      const answer =
-        res?.data?.answer ??
-        "⚠️ No answer returned from the server.";
-
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: answer },
+        { role: "assistant", content: res.data.answer },
       ]);
     } catch (err) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.message ||
-        "Failed to get answer";
-
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: `❌ ${msg}` },
+        {
+          role: "assistant",
+          content: "❌ Network error. Backend not reachable.",
+        },
       ]);
     } finally {
       setLoading(false);
@@ -59,7 +47,6 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-[65vh] rounded-xl border border-slate-800 bg-slate-900">
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <p className="text-sm text-slate-400">
@@ -70,26 +57,22 @@ export default function Chat() {
         {messages.map((m, i) => (
           <div
             key={i}
-            className={`max-w-[75%] rounded-lg px-4 py-2 text-sm leading-relaxed ${
+            className={`max-w-[75%] rounded-lg px-4 py-2 text-sm ${
               m.role === "user"
                 ? "ml-auto bg-blue-600 text-white"
                 : "bg-slate-800 text-slate-100"
             }`}
           >
             {m.role === "assistant" ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {m.content}
-              </ReactMarkdown>
+              <ReactMarkdown>{m.content}</ReactMarkdown>
             ) : (
               m.content
             )}
           </div>
         ))}
-
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="border-t border-slate-800 p-3 flex gap-3">
         <input
           value={input}
