@@ -1,4 +1,4 @@
-# rag_simple.py — Local NumPy RAG + Gemini (latest-doc aware)
+# rag_simple.py — Local NumPy RAG + Gemini (Render-safe, latest-doc aware)
 
 import os
 import re
@@ -9,14 +9,13 @@ from datetime import datetime
 
 import numpy as np
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
 from pypdf import PdfReader
 import google.generativeai as genai
 
 
-# ---------------------------
+# =========================
 # Helpers
-# ---------------------------
+# =========================
 
 def normalize_ocr_text(text: str) -> str:
     text = re.sub(r"(?<=\w)\s(?=\w)", "", text)
@@ -33,19 +32,19 @@ def chunk_text(text: str, chunk_size=800, overlap=200):
     return out
 
 
-def _read_pdf(path: str) -> str:
+def read_pdf(path: str) -> str:
     reader = PdfReader(path)
     return "\n".join(p.extract_text() or "" for p in reader.pages)
 
 
-def _point_id(source: str, chunk_id: int) -> int:
+def point_id(source: str, chunk_id: int) -> int:
     h = hashlib.blake2b(f"{source}:{chunk_id}".encode(), digest_size=8).digest()
     return int.from_bytes(h, "big", signed=True)
 
 
-# ---------------------------
+# =========================
 # Lite Vector Store
-# ---------------------------
+# =========================
 
 class LiteVectorStore:
     def __init__(self, index_dir="./lite_index"):
@@ -106,21 +105,23 @@ class LiteVectorStore:
         self._save()
 
 
-# ---------------------------
-# SimpleRAG (latest-doc aware)
-# ---------------------------
+# =========================
+# SimpleRAG (Gemini-only embeddings)
+# =========================
 
 class SimpleRAG:
     def __init__(self, index_dir="./lite_index"):
         load_dotenv()
 
-        self.embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         self.store = LiteVectorStore(index_dir)
+        self.meta_path = f"{index_dir}/meta.json"
 
-        self.latest_source = None  # ⭐ KEY ADDITION
+        self.latest_source = None
+        self._load_meta()
 
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        self.model = genai.GenerativeModel(
+
+        self.chat_model = genai.GenerativeModel(
             model_name="models/gemini-2.5-flash",
             system_instruction=(
                 "You are a document analysis assistant.\n"
@@ -132,22 +133,42 @@ class SimpleRAG:
             )
         )
 
-    def embed(self, texts):
-        return self.embedder.encode(
-            texts, normalize_embeddings=True
-        ).astype(np.float32)
+    # -------- Metadata --------
+
+    def _load_meta(self):
+        if os.path.exists(self.meta_path):
+            with open(self.meta_path) as f:
+                self.latest_source = json.load(f).get("latest_source")
+
+    def _save_meta(self):
+        with open(self.meta_path, "w") as f:
+            json.dump({"latest_source": self.latest_source}, f)
+
+    # -------- Embeddings (Gemini) --------
+
+    def embed(self, texts: List[str]) -> np.ndarray:
+        vectors = []
+        for t in texts:
+            r = genai.embed_content(
+                model="models/embedding-001",
+                content=t
+            )
+            vectors.append(r["embedding"])
+        return np.array(vectors, dtype=np.float32)
 
     # -------- Ingestion --------
 
     def ingest_text(self, text: str, source: str):
         text = normalize_ocr_text(text)
         chunks = chunk_text(text)
-        vecs = self.embed(chunks)
 
+        vectors = self.embed(chunks)
         now = datetime.utcnow().isoformat()
-        self.latest_source = source  # ⭐ mark as active document
 
-        ids = np.array([_point_id(source, i) for i in range(len(chunks))])
+        self.latest_source = source
+        self._save_meta()
+
+        ids = np.array([point_id(source, i) for i in range(len(chunks))])
         payloads = [
             {
                 "source": source,
@@ -158,22 +179,18 @@ class SimpleRAG:
             for i, ch in enumerate(chunks)
         ]
 
-        self.store.upsert(ids, vecs, payloads)
+        self.store.upsert(ids, vectors, payloads)
 
     # -------- Retrieval --------
 
     def retrieve(self, question, k=5):
         qv = self.embed([question])[0]
 
-        # 1️⃣ Prefer latest document
         if self.latest_source:
-            hits = self.store.search(
-                qv, k=k, source_filter=self.latest_source
-            )
+            hits = self.store.search(qv, k=k, source_filter=self.latest_source)
             if hits:
                 return hits
 
-        # 2️⃣ Fallback to global search
         return self.store.search(qv, k=k)
 
     # -------- Answer --------
@@ -199,7 +216,7 @@ Context:
 {context_text}
 """
 
-        resp = self.model.generate_content(prompt)
+        resp = self.chat_model.generate_content(prompt)
         answer = resp.text.strip()
 
         return (answer, contexts) if return_chunks else answer
@@ -207,3 +224,4 @@ Context:
     def recreate_collection(self):
         self.store.reset()
         self.latest_source = None
+        self._save_meta()
