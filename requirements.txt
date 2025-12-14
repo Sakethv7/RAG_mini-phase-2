@@ -1,18 +1,13 @@
-# --- Web API ---
-fastapi>=0.110.0
-uvicorn[standard]>=0.27.0
+--extra-index-url https://download.pytorch.org/whl/cpu
 
-# --- RAG / ML ---
-sentence-transformers>=3.0.0
-torch>=2.2.0
-numpy>=1.26.0
+torch==2.2.2+cpu
+sentence-transformers==2.6.1
 
-# --- Vector / Storage ---
-qdrant-client>=1.12.0   # optional, fine to keep
-
-# --- File parsing ---
-pypdf>=4.0.0
-python-dotenv>=1.0.1
-
-# --- LLM ---
-google-generativeai>=0.8.3
+fastapi
+uvicorn
+python-multipart
+pydantic
+numpy
+pypdf
+python-dotenv
+google-generativeai
