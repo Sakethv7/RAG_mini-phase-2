@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
  * Option A: Backend-only on Render
  * Change this ONLY if backend URL changes
  */
-const API_BASE = "https://rag-mini.onrender.com";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
