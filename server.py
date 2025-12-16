@@ -10,14 +10,13 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
-        "https://rag-ui-frontend.onrender.com",  # ✅ Your actual frontend URL
-        "https://rag-mini.onrender.com",
+        "https://rag-ui-frontend.onrender.com",
     ],
-    allow_credentials=True,
+    allow_credentials=False,   # 🔥 IMPORTANT
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 rag = SimpleRAG()
 
