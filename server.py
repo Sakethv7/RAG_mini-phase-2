@@ -29,6 +29,8 @@ class AskRequest(BaseModel):
 
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
+    print("UPLOAD STARTED:", file.filename)
+    
     if not file.filename.lower().endswith((".pdf", ".txt", ".md")):
         raise HTTPException(status_code=400, detail="Unsupported file type")
 

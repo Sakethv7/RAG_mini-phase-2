@@ -119,7 +119,11 @@ class SimpleRAG:
         self.latest_source = None
         self._load_meta()
 
-        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise RuntimeError("GOOGLE_API_KEY not set")
+
+        genai.configure(api_key=api_key)
 
         self.chat_model = genai.GenerativeModel(
             model_name="models/gemini-2.5-flash",
@@ -147,6 +151,8 @@ class SimpleRAG:
     # -------- Embeddings (Gemini) --------
 
     def embed(self, texts: List[str]) -> np.ndarray:
+        print("Embedding", len(texts), "chunks") 
+
         vectors = []
         for t in texts:
             r = genai.embed_content(
