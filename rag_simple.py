@@ -366,8 +366,9 @@ class SimpleRAG:
     # -------- Retrieval --------
 
     def retrieve(self, question, k=None):
-        if self.store.vectors is None or self.store.vectors.size == 0:
-            return []
+        if hasattr(self.store, "vectors"):
+            if self.store.vectors is None or self.store.vectors.size == 0:
+                return []
 
         qv = self.embed([question])[0]
         qv = qv / (np.linalg.norm(qv) or 1)
