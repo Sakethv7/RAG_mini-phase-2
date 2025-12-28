@@ -315,11 +315,9 @@ class SimpleRAG:
             system_instruction=(
                 "You are a document analysis assistant.\n"
                 "Use ONLY the provided context chunks.\n"
-                "Deliver a concise fit assessment for an AI/ML role.\n"
-                "Structure with bolded labels: **Assessment** (1–2 sentences), **Strengths** (3–5 bullets), **Gaps/Risks** (1–2 bullets), **Fit** (one short verdict sentence).\n"
-                "Do NOT list full resume skills or long task lists; summarize impact and relevance.\n"
-                "Do NOT include sources or citations unless explicitly asked.\n"
-                "No speculation; if information is missing, say so clearly."
+                "Be concise and helpful. Provide summaries or answers based on the question.\n"
+                "If asked for playful or creative phrasing, you may add light, non-abusive humor; never be insulting or harmful.\n"
+                "Avoid speculation; if information is missing, say so clearly."
             )
         )
 
@@ -430,10 +428,9 @@ Context:
 {context_text}
 
 Formatting rules (must follow):
-- Use bolded labels to separate sections: **Assessment**, **Strengths**, **Gaps/Risks**, **Fit**.
-- Be brief: strengths 3–5 bullets max; gaps 1–2 bullets max.
-- Focus on relevance to AI/ML role; avoid full skill dumps or long experience lists.
-- No sources or citations unless explicitly asked.
+- Use Markdown where helpful; bullets are fine but not required.
+- Keep it concise and relevant to the question.
+- Be respectful; do not generate insults. If asked for humor, keep it light and non-abusive.
 - If context is insufficient, say so explicitly. Avoid speculation.
 """
 
