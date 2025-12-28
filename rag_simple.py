@@ -287,9 +287,9 @@ class SimpleRAG:
         self.retrieval_k = int(os.getenv("RETRIEVAL_K", 8))
         self.answer_top_n = int(os.getenv("ANSWER_TOP_N", 5))
         self.vector_backend = os.getenv("VECTOR_BACKEND", "local").lower()
-        self.qdrant_url = os.getenv("QDRANT_URL")
-        self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
-        self.qdrant_collection = os.getenv("QDRANT_COLLECTION", "rag_docs")
+        self.qdrant_url = (os.getenv("QDRANT_URL") or "").strip()
+        self.qdrant_api_key = (os.getenv("QDRANT_API_KEY") or "").strip()
+        self.qdrant_collection = os.getenv("QDRANT_COLLECTION", "rag_docs").strip()
 
         genai.configure(api_key=api_key)
 
