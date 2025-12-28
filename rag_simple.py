@@ -191,7 +191,19 @@ class QdrantVectorStore:
                 query_filter=qmodels.Filter(must=must) if must else None
             )
         else:
-            raise RuntimeError("qdrant-client is missing search; upgrade qdrant-client>=1.9.0")
+            # Fallback to HTTP points_api if client is very old
+            http_client = getattr(self.client, "http", None)
+            if http_client and hasattr(http_client, "points_api"):
+                res = http_client.points_api.search_points(
+                    collection_name=self.collection,
+                    search_request=qmodels.SearchRequest(
+                        vector=qvec.tolist(),
+                        limit=k,
+                        filter=qmodels.Filter(must=must) if must else None,
+                    ),
+                ).result
+            else:
+                raise RuntimeError("qdrant-client is missing search; upgrade qdrant-client>=1.9.0")
         out = []
         for r in res:
             payload = r.payload or {}
