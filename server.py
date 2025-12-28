@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from rag_simple import SimpleRAG, read_pdf
 import os
 import shutil
+import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 from google.api_core import exceptions as google_exceptions
 
 app = FastAPI()
@@ -20,7 +22,7 @@ app.add_middleware(
 
 rag = SimpleRAG()
 
-UPLOAD_DIR = "documents"
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "documents")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 class AskRequest(BaseModel):
@@ -48,6 +50,29 @@ async def upload(file: UploadFile = File(...)):
     else:
         with open(path, "r", encoding="utf-8") as f:
             text = f.read()
+
+    # Optional S3 backup
+    s3_bucket = os.getenv("S3_BUCKET")
+    if s3_bucket:
+        s3_prefix = os.getenv("S3_PREFIX", "").strip("/")
+        key = f"{s3_prefix + '/' if s3_prefix else ''}documents/{safe_name}"
+        try:
+            s3 = boto3.client(
+                "s3",
+                region_name=os.getenv("AWS_REGION"),
+                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            )
+            s3.upload_file(
+                Filename=path,
+                Bucket=s3_bucket,
+                Key=key,
+                ExtraArgs={"ACL": "private", "ServerSideEncryption": "AES256"},
+            )
+            print(f"Uploaded to S3: s3://{s3_bucket}/{key}")
+        except (BotoCoreError, ClientError) as e:
+            print(f"S3 upload failed: {e}")
+            raise HTTPException(status_code=500, detail="S3 upload failed")
 
     try:
         rag.ingest_text(text, source=safe_name)

@@ -8,3 +8,4 @@ python-dotenv
 google-generativeai
 sentence-transformers
 qdrant-client
+boto3
