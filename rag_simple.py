@@ -284,3 +284,18 @@ Formatting rules (must follow):
         self.store.reset()
         self.latest_source = None
         self._save_meta()
+
+    def list_sources(self):
+        if not self.store.payloads:
+            return []
+        seen = {}
+        for p in self.store.payloads:
+            src = p.get("source")
+            if not src:
+                continue
+            seen.setdefault(src, {"source": src, "chunks": 0, "latest_timestamp": ""})
+            seen[src]["chunks"] += 1
+            ts = p.get("timestamp") or ""
+            if ts > seen[src]["latest_timestamp"]:
+                seen[src]["latest_timestamp"] = ts
+        return sorted(seen.values(), key=lambda x: x["source"])

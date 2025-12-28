@@ -70,4 +70,9 @@ def ask(req: AskRequest):
 @app.get("/")
 def health():
     return {"status": "ok","message": "RAG server running"}
+
+
+@app.get("/sources")
+def list_sources():
+    return {"sources": rag.list_sources()}
  
