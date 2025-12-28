@@ -176,12 +176,22 @@ class QdrantVectorStore:
                 key="source",
                 match=qmodels.MatchValue(value=source_filter)
             ))
-        res = self.client.search(
-            collection_name=self.collection,
-            query_vector=qvec.tolist(),
-            limit=k,
-            query_filter=qmodels.Filter(must=must) if must else None
-        )
+        if hasattr(self.client, "search"):
+            res = self.client.search(
+                collection_name=self.collection,
+                query_vector=qvec.tolist(),
+                limit=k,
+                query_filter=qmodels.Filter(must=must) if must else None
+            )
+        elif hasattr(self.client, "search_points"):
+            res = self.client.search_points(
+                collection_name=self.collection,
+                query_vector=qvec.tolist(),
+                limit=k,
+                query_filter=qmodels.Filter(must=must) if must else None
+            )
+        else:
+            raise RuntimeError("qdrant-client is missing search; upgrade qdrant-client>=1.9.0")
         out = []
         for r in res:
             payload = r.payload or {}
