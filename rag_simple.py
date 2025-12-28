@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from pypdf import PdfReader
 import google.generativeai as genai
 from google.api_core import exceptions as google_exceptions
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as qmodels
 
 
 # =========================
@@ -114,6 +116,110 @@ class LiteVectorStore:
         self.vectors, self.ids, self.payloads = None, None, []
         self._save()
 
+    def list_sources(self):
+        if not self.payloads:
+            return []
+        seen = {}
+        for p in self.payloads:
+            src = p.get("source")
+            if not src:
+                continue
+            seen.setdefault(src, {"source": src, "chunks": 0, "latest_timestamp": ""})
+            seen[src]["chunks"] += 1
+            ts = p.get("timestamp") or ""
+            if ts > seen[src]["latest_timestamp"]:
+                seen[src]["latest_timestamp"] = ts
+        return sorted(seen.values(), key=lambda x: x["source"])
+
+
+class QdrantVectorStore:
+    def __init__(self, url, api_key, collection):
+        self.url = url
+        self.api_key = api_key
+        self.collection = collection
+        self.client = QdrantClient(url=url, api_key=api_key)
+        self.vectors_size = None
+
+    def _ensure_collection(self, vector_size):
+        if self.vectors_size == vector_size:
+            return
+        self.vectors_size = vector_size
+        try:
+            self.client.get_collection(self.collection)
+        except Exception:
+            self.client.recreate_collection(
+                collection_name=self.collection,
+                vectors_config=qmodels.VectorParams(size=vector_size, distance=qmodels.Distance.COSINE)
+            )
+
+    def upsert(self, ids, vectors, payloads):
+        vec_size = vectors.shape[1]
+        self._ensure_collection(vec_size)
+        points = []
+        for i, v in enumerate(vectors):
+            points.append(
+                qmodels.PointStruct(
+                    id=int(ids[i]),
+                    vector=v.tolist(),
+                    payload=payloads[i]
+                )
+            )
+        self.client.upsert(collection_name=self.collection, points=points, wait=True)
+
+    def search(self, qvec, k=5, source_filter=None):
+        if self.vectors_size is None:
+            return []
+        must = []
+        if source_filter:
+            must.append(qmodels.FieldCondition(
+                key="source",
+                match=qmodels.MatchValue(value=source_filter)
+            ))
+        res = self.client.search(
+            collection_name=self.collection,
+            query_vector=qvec.tolist(),
+            limit=k,
+            query_filter=qmodels.Filter(must=must) if must else None
+        )
+        out = []
+        for r in res:
+            payload = r.payload or {}
+            out.append({**payload, "score": float(r.score)})
+        return out
+
+    def reset(self):
+        try:
+            self.client.delete_collection(self.collection)
+        except Exception:
+            pass
+        self.vectors_size = None
+
+    def list_sources(self):
+        if self.vectors_size is None:
+            return []
+        page = None
+        seen = {}
+        while True:
+            scroll_res, page = self.client.scroll(
+                collection_name=self.collection,
+                with_payload=True,
+                limit=128,
+                offset=page
+            )
+            for p in scroll_res:
+                payload = p.payload or {}
+                src = payload.get("source")
+                if not src:
+                    continue
+                seen.setdefault(src, {"source": src, "chunks": 0, "latest_timestamp": ""})
+                seen[src]["chunks"] += 1
+                ts = payload.get("timestamp") or ""
+                if ts > seen[src]["latest_timestamp"]:
+                    seen[src]["latest_timestamp"] = ts
+            if not page:
+                break
+        return sorted(seen.values(), key=lambda x: x["source"])
+
 
 # =========================
 # SimpleRAG (Gemini)
@@ -140,10 +246,23 @@ class SimpleRAG:
         )
         self.retrieval_k = int(os.getenv("RETRIEVAL_K", 8))
         self.answer_top_n = int(os.getenv("ANSWER_TOP_N", 5))
+        self.vector_backend = os.getenv("VECTOR_BACKEND", "local").lower()
+        self.qdrant_url = os.getenv("QDRANT_URL")
+        self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
+        self.qdrant_collection = os.getenv("QDRANT_COLLECTION", "rag_docs")
 
         genai.configure(api_key=api_key)
 
-        self.store = LiteVectorStore(index_dir)
+        if self.vector_backend == "qdrant":
+            if not (self.qdrant_url and self.qdrant_api_key):
+                raise RuntimeError("VECTOR_BACKEND=qdrant requires QDRANT_URL and QDRANT_API_KEY")
+            self.store = QdrantVectorStore(
+                url=self.qdrant_url,
+                api_key=self.qdrant_api_key,
+                collection=self.qdrant_collection,
+            )
+        else:
+            self.store = LiteVectorStore(index_dir)
         self.meta_path = f"{index_dir}/meta.json"
 
         self.latest_source = None
@@ -286,16 +405,6 @@ Formatting rules (must follow):
         self._save_meta()
 
     def list_sources(self):
-        if not self.store.payloads:
-            return []
-        seen = {}
-        for p in self.store.payloads:
-            src = p.get("source")
-            if not src:
-                continue
-            seen.setdefault(src, {"source": src, "chunks": 0, "latest_timestamp": ""})
-            seen[src]["chunks"] += 1
-            ts = p.get("timestamp") or ""
-            if ts > seen[src]["latest_timestamp"]:
-                seen[src]["latest_timestamp"] = ts
-        return sorted(seen.values(), key=lambda x: x["source"])
+        if hasattr(self.store, "list_sources"):
+            return self.store.list_sources()
+        return []
