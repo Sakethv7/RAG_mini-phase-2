@@ -6,3 +6,4 @@ numpy
 pypdf
 python-dotenv
 google-generativeai
+httpx
