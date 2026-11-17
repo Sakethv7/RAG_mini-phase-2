@@ -122,7 +122,7 @@ class SimpleRAG:
             raise RuntimeError("GOOGLE_API_KEY not set")
 
         self.chat_model_name = os.getenv(
-            "GEMINI_MODEL", "models/gemini-2.0-flash"
+            "GEMINI_MODEL", "models/gemini-3.5-flash-lite"
         )
         # Embedding model: Gemini gemini-embedding-001, truncated to EMBED_DIM
         # and L2-normalized so dot product == cosine similarity (index: ./lite_index).
