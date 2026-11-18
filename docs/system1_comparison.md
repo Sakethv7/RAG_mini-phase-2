@@ -74,3 +74,9 @@ The memory cost is high for a "light" app. A 1B to 2B Qwen model would use about
 1. You review `tests/labels.jsonl`.
 2. Rerun the Gemini side when the quota allows. The script resumes cleanly: run `python tests/eval_decisions.py` with Ollama running and `LOCAL_LLM_MODEL=qwen3:8b` set.
 3. Optionally test a smaller Qwen model.
+
+## Addendum, 2026-11-17: false refusals
+
+The 100% guard accuracy above covers only the 30 guard questions. I later sent the 30 benign route questions (lookups, summaries, greetings) through the local guard. It refused 2 of 30: "Who won the Battle of the Ten Kings?" and "yo", both labeled OFF_TOPIC. See `docs/writeup.md` and `docs/evidence/guard_false_refusals.json`.
+
+Fix, same day: I changed the guard prompt. The 30 benign questions then showed 0 false refusals, and a fresh set of 18 questions written after the change showed 0 wrong labels. Details and limits are in `docs/writeup.md`.

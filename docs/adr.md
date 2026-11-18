@@ -176,3 +176,41 @@ Linked explainer: [guarded-pipeline.html](visuals/guarded-pipeline.html).
 **Outcome (2026-11-16).** The eval script and 72 labels exist (`tests/eval_decisions.py`, `tests/labels.jsonl`). I wrote the labels, so you must review them before you trust the bar. The Gemini run failed on quota, so no switch decision is made.
 
 **Given up.** Speed to ship. Privacy of question text in the log. A small eval set gives wide error bars, and the report will say so.
+
+## ADR-6: Add `jev`, a trained System 1 model, as a guard and route backend
+
+### Visual Level
+
+```mermaid
+flowchart TD
+    Q[Question arrives] --> B{Which backend?}
+    B -- jev --> J[Send question to TypeSafe Jev]
+    B -- local --> L[Prompt Qwen3-8B on Ollama]
+    J --> P[Get label and probabilities]
+    L --> T[Parse one label from text]
+    P --> D[Log label and probabilities]
+    T --> D
+    D --> C{Label valid?}
+    C -- yes --> N[Guard refuses or route picks path]
+    C -- no, guard --> F[Guard fails closed, 503]
+    C -- no, route --> R[Route falls back to LOOKUP]
+    J -. no key or network error .-> C
+    classDef new fill:#cfe3ff,stroke:#1d4ed8,color:#0b1b3a
+    classDef fail fill:#fecaca,stroke:#b91c1c,color:#450a0a
+    class B,J,P new
+    class F,R fail
+```
+
+Blue is new. Red is a failure path. The `local` steps are unchanged. Jev returns a label and a probability for each label, so the log keeps the confidence. Level 3 explainer: skipped, because this chart shows every step and both failure paths that the change touches.
+
+**Context.** ADR-4 used Qwen3-8B as the System 1 model. Qwen is a generative model. We prompt it to write one label, so it is a stand-in. Jev from TypeSafe AI is not generative. It returns typed answers with probabilities.
+
+**Options.** A. Keep Qwen only. B. Add `jev` as a third backend for guard and route. C. Train our own classifier on embeddings.
+
+**Choice.** B. `jev_choice()` in `decisions.py` makes one HTTP call with `httpx` to `POST https://api.typesafe.ai/v1/systemone`. It sends the question as `state` and one Choice question with the same labels as the prompt. The key is `TYPESAFE_API_KEY`. The model is `jev-latest`, or `JEV_MODEL`. Failures follow ADR-3: guard fails closed, route falls back to LOOKUP. Rerank does not allow `jev`, because it is not a closed choice. We did not pick C, because we have only 72 labels, and I wrote them.
+
+**Consequences.** Each guarded question sends its text to TypeSafe. The log now holds probabilities, so we can test a threshold later. The listed price is $0.042 per million input tokens. Rate limits are in the console and are not measured.
+
+**Outcome (2026-11-17).** Guard on all 96 test questions: 0 wrong, mean 177 ms. See `docs/writeup.md`.
+
+**Given up.** Question privacy (the text leaves the machine). An outside service that can fail or change. A vendor key. The offline use that Qwen gave.
