@@ -24,22 +24,28 @@ export default function Chat() {
     setLoading(true);
 
     try {
-      const res = await axios.post(`${API_BASE}/ask`, {
+      const res = await axios.post(`${API_BASE}/ask/guarded`, {
         question: userMsg.content,
       });
 
+      const sources = [
+        ...new Set((res.data.sources || []).map((s) => s.source)),
+      ];
+
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: res.data.answer },
+        { role: "assistant", content: res.data.answer, sources },
       ]);
     } catch (err) {
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content: "❌ Network error. Backend not reachable.",
-        },
-      ]);
+      const status = err.response?.status;
+      const content =
+        status === 503
+          ? "The safety check is unavailable. Try again in a moment."
+          : status === 502
+          ? "The model is unavailable right now. Try again."
+          : "❌ Network error. Backend not reachable.";
+
+      setMessages((m) => [...m, { role: "assistant", content }]);
     } finally {
       setLoading(false);
     }
@@ -67,6 +73,11 @@ export default function Chat() {
               <ReactMarkdown>{m.content}</ReactMarkdown>
             ) : (
               m.content
+            )}
+            {m.sources?.length > 0 && (
+              <p className="mt-2 text-xs text-slate-400">
+                Sources: {m.sources.join(", ")}
+              </p>
             )}
           </div>
         ))}
