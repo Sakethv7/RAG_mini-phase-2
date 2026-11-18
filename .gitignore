@@ -67,3 +67,6 @@ eval.py
 
 # decision log (contains user questions)
 logs/
+
+# Demo documents
+demo_docs/
