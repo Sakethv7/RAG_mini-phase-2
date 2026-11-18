@@ -81,10 +81,12 @@ class Decision:
 
 
 def backends() -> dict:
-    """Read and validate the backend of each step. Call at startup so bad config fails early."""
+    """Read and validate the backend of each step. Call at startup so bad config fails early.
+    Guard and route default to jev when TYPESAFE_API_KEY is set, else to llm (ADR-6)."""
     chosen = {}
     for step, allowed in ALLOWED.items():
-        value = os.getenv(f"{step.upper()}_BACKEND", DEFAULTS[step]).strip().lower()
+        default = "jev" if step in ("guard", "route") and os.getenv("TYPESAFE_API_KEY") else DEFAULTS[step]
+        value = os.getenv(f"{step.upper()}_BACKEND", default).strip().lower()
         if value not in allowed:
             raise RuntimeError(f"{step.upper()}_BACKEND={value!r} is invalid. Allowed: {allowed}")
         chosen[step] = value
