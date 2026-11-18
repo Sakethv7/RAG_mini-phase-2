@@ -143,6 +143,17 @@ class QdrantVectorStore:
         self.collection = collection
         self.client = QdrantClient(url=url, api_key=api_key)
         self.vectors_size = None
+        self._read_existing_size()
+
+    def _read_existing_size(self):
+        """After a restart, learn the size of a collection that already exists. Without this,
+        search and list_sources return nothing until the first upload of the session."""
+        try:
+            vectors = self.client.get_collection(self.collection).config.params.vectors
+        except Exception:
+            return  # no collection yet, or Qdrant unreachable: upsert creates it later
+        if isinstance(vectors, qmodels.VectorParams):
+            self.vectors_size = vectors.size
 
     def _ensure_collection(self, vector_size):
         if self.vectors_size == vector_size:
