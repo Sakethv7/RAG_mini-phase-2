@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guarded ask pipeline</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #111827; --line: #6b7280;
+    --old-fill: #e5e7eb; --old-stroke: #6b7280;
+    --new-fill: #cfe3ff; --new-stroke: #1d4ed8;
+    --fail-fill: #fecaca; --fail-stroke: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a; --fg: #e5e7eb; --line: #94a3b8;
+      --old-fill: #334155; --old-stroke: #94a3b8;
+      --new-fill: #1e3a8a; --new-stroke: #93c5fd;
+      --fail-fill: #7f1d1d; --fail-stroke: #fca5a5;
+    }
+  }
+  html, body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 820px; margin: 0 auto; padding: 12px 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.cap { margin: 0 0 8px; }
+  svg { width: 100%; height: auto; max-height: 86vh; display: block; }
+  .box { stroke-width: 1.5; }
+  .old { fill: var(--old-fill); stroke: var(--old-stroke); }
+  .new { fill: var(--new-fill); stroke: var(--new-stroke); }
+  .fail { fill: var(--fail-fill); stroke: var(--fail-stroke); }
+  text { fill: var(--fg); font-size: 12.5px; text-anchor: middle; }
+  .lbl { font-size: 11px; text-anchor: start; }
+  .edge { stroke: var(--line); stroke-width: 1.5; fill: none; marker-end: url(#arr); }
+  .key { font-size: 12px; text-anchor: start; }
+</style>
+</head>
+<body>
+<main>
+<h1>Guarded ask pipeline (ADR-1 to ADR-5)</h1>
+<p class="cap">New endpoint <code>/ask/guarded</code>. Grey steps exist today. Blue steps are new. Red steps are failure paths.</p>
+<svg viewBox="0 0 780 880" role="img" aria-label="Flowchart of the guarded ask pipeline">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+    </marker>
+  </defs>
+
+  <!-- key -->
+  <rect x="560" y="8" width="14" height="14" class="box old"/><text x="580" y="20" class="key">Exists today</text>
+  <rect x="560" y="28" width="14" height="14" class="box new"/><text x="580" y="40" class="key">New or changed</text>
+  <rect x="560" y="48" width="14" height="14" class="box fail"/><text x="580" y="60" class="key">Failure path</text>
+
+  <!-- main column x=260 -->
+  <!-- 1 Receive -->
+  <rect x="160" y="20" width="200" height="40" rx="6" class="box new"/><text x="260" y="45">Receive question</text>
+  <path d="M260 60 V82" class="edge"/>
+
+  <!-- 2 Guard diamond -->
+  <polygon points="260,82 360,122 260,162 160,122" class="box new"/><text x="260" y="126">Is it safe?</text>
+  <path d="M260 162 V190" class="edge"/><text x="268" y="180" class="lbl">yes</text>
+  <path d="M360 122 H500" class="edge"/><text x="410" y="116" class="lbl">no</text>
+  <rect x="500" y="102" width="220" height="40" rx="6" class="box fail"/><text x="610" y="127">Return refusal</text>
+
+  <!-- 3 Router diamond -->
+  <polygon points="260,190 360,230 260,270 160,230" class="box new"/><text x="260" y="226">Needs</text><text x="260" y="240">documents?</text>
+  <path d="M260 270 V298" class="edge"/><text x="268" y="288" class="lbl">yes</text>
+  <path d="M360 230 H500" class="edge"/><text x="410" y="224" class="lbl">no</text>
+  <rect x="500" y="210" width="220" height="40" rx="6" class="box new"/><text x="610" y="235">Answer, then return</text>
+
+  <!-- 4 Embed -->
+  <rect x="160" y="298" width="200" height="40" rx="6" class="box old"/><text x="260" y="323">Embed the question</text>
+  <path d="M260 338 V360" class="edge"/>
+
+  <!-- 5 Embed fails diamond -->
+  <polygon points="260,360 360,395 260,430 160,395" class="box old"/><text x="260" y="399">Embed failed?</text>
+  <path d="M260 430 V456" class="edge"/><text x="268" y="448" class="lbl">no</text>
+  <path d="M360 395 H500" class="edge"/><text x="410" y="389" class="lbl">yes</text>
+  <rect x="500" y="375" width="220" height="40" rx="6" class="box fail"/><text x="610" y="400">Return 502</text>
+
+  <!-- 6 Fetch -->
+  <rect x="160" y="456" width="200" height="40" rx="6" class="box new"/><text x="260" y="481">Fetch top 20 chunks</text>
+  <path d="M260 496 V516" class="edge"/>
+
+  <!-- 7 Rerank -->
+  <rect x="160" y="516" width="200" height="40" rx="6" class="box new"/><text x="260" y="541">Rerank to top N</text>
+  <path d="M260 556 V578" class="edge"/>
+
+  <!-- 8 Reranker works diamond -->
+  <polygon points="260,578 360,613 260,648 160,613" class="box new"/><text x="260" y="617">Reranker ok?</text>
+  <path d="M260 648 V678" class="edge"/><text x="230" y="674" class="lbl">yes</text>
+  <path d="M360 613 H500" class="edge"/><text x="410" y="607" class="lbl">no</text>
+  <rect x="500" y="593" width="220" height="40" rx="6" class="box fail"/><text x="610" y="618">Use cosine order</text>
+  <path d="M610 633 V663 H262" class="edge"/>
+
+  <!-- 9 Floor diamond -->
+  <polygon points="260,678 360,713 260,748 160,713" class="box new"/><text x="260" y="710">Best score</text><text x="260" y="724">above floor?</text>
+  <path d="M360 713 H500" class="edge"/><text x="410" y="707" class="lbl">no</text>
+  <rect x="500" y="693" width="220" height="40" rx="6" class="box fail"/><text x="610" y="718">Return not found</text>
+  <path d="M260 748 V768" class="edge"/><text x="268" y="762" class="lbl">yes</text>
+
+  <!-- 10 Generate -->
+  <rect x="160" y="768" width="200" height="40" rx="6" class="box old"/><text x="260" y="793">Generate with Gemini</text>
+  <path d="M260 808 V828" class="edge"/>
+
+  <!-- 11 Return -->
+  <rect x="160" y="828" width="200" height="40" rx="6" class="box new"/><text x="260" y="853">Return answer and trace</text>
+</svg>
+<p class="cap">The chat reply also ends at the final return. If Gemini fails at the generate step, the request returns 502, as it does today. If the guard backend fails, the request returns 503 (not drawn).</p>
+</main>
+</body>
+</html>

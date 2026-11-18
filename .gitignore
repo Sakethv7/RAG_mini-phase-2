@@ -64,3 +64,6 @@ lite_index/
 check_available_models.py
 debug.py
 eval.py
+
+# decision log (contains user questions)
+logs/
