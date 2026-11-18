@@ -66,7 +66,17 @@ from decisions import backends, rerank  # noqa: E402
 CHUNKS = [{"text": f"passage {i}", "source": "a.txt", "chunk_id": i, "score": 0.9 - i * 0.1} for i in range(4)]
 
 
+def test_backends_default_to_jev_when_keyed(monkeypatch):
+    for s in ("GUARD", "ROUTE", "RERANK"):
+        monkeypatch.delenv(f"{s}_BACKEND", raising=False)
+    monkeypatch.setenv("TYPESAFE_API_KEY", "x")
+    assert backends() == {"guard": "jev", "route": "jev", "rerank": "off"}
+    monkeypatch.setenv("GUARD_BACKEND", "llm")  # an explicit setting still wins
+    assert backends()["guard"] == "llm"
+
+
 def test_backends_defaults(monkeypatch):
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     for s in ("GUARD", "ROUTE", "RERANK"):
         monkeypatch.delenv(f"{s}_BACKEND", raising=False)
     assert backends() == {"guard": "llm", "route": "llm", "rerank": "off"}

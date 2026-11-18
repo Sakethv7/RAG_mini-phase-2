@@ -211,6 +211,8 @@ Blue is new. Red is a failure path. The `local` steps are unchanged. Jev returns
 
 **Consequences.** Each guarded question sends its text to TypeSafe. The log now holds probabilities, so we can test a threshold later. The listed price is $0.042 per million input tokens. Rate limits are in the console and are not measured.
 
+**Default (2026-11-18).** Guard and route default to `jev` when `TYPESAFE_API_KEY` is set, and to `llm` when it is not. An explicit `GUARD_BACKEND` or `ROUTE_BACKEND` always wins. The cost: setting a Jev key also sends every question to TypeSafe, unless you pin the backend.
+
 **Outcome (2026-11-17).** Guard on all 96 test questions: 0 wrong, mean 177 ms. See `docs/writeup.md`.
 
 **Given up.** Question privacy (the text leaves the machine). An outside service that can fail or change. A vendor key. The offline use that Qwen gave.
