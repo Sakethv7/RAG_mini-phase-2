@@ -3,7 +3,7 @@ import axios from "axios";
 import ReactMarkdown from "react-markdown";
 
 const API_BASE =
-  import.meta.env.VITE_API_BASE || "https://rag-mini.onrender.com";
+  import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);

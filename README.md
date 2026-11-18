@@ -1,12 +1,10 @@
-# RAG-Mini — Simple Document Q&A (Gemini + Local Vector Store)
+# RAG-Mini — Simple Document Q&A (Gemini + Vector Store)
 
-A from-scratch Retrieval-Augmented Generation (RAG) system for querying documents using local embeddings and Google Gemini.
+A from-scratch Retrieval-Augmented Generation (RAG) system for querying documents. Uses Google Gemini for embeddings and answer generation by default, with an optional local embedder and either a built-in NumPy store or Qdrant.
 
 No LangChain.
-No Pinecone / Qdrant Cloud.
-No managed vector DB.
-
-Embeddings run fully offline, vectors are stored locally, and Gemini is used only for final answers.
+No heavyweight orchestration.
+Embeddings are API-based by default; set `GOOGLE_API_KEY` before running.
 
 
 
@@ -17,29 +15,30 @@ React UI (Vite)
    ▼
 FastAPI Backend
    │
-   ├─ Local embeddings (SentenceTransformers)
-   ├─ NumPy vector store (./lite_index)
+   ├─ Gemini embeddings (API) or local `sentence-transformers`
+   ├─ Vector store: NumPy (local) or Qdrant (cloud)
    ├─ Retrieval (cosine similarity)
-   └─ Gemini (answer synthesis only)
+   ├─ Gemini (answer synthesis)
+   └─ Optional S3 backup for uploaded documents
 
 ## Features
 - **Document formats:** `.txt`, `.md`, `.pdf`
 - **Smart chunking:** 800 chars with 200 overlap (configurable)
-- **Semantic search:** `sentence-transformers/all-MiniLM-L6-v2` (local, no API)
-- **Local vector store:** tiny NumPy index on disk (`./lite_index`) — no services to run
+- **Semantic search:** Gemini embeddings (default) or local `sentence-transformers` + cosine similarity
+- **Vector store:** tiny NumPy index on disk (`./lite_index`) or Qdrant Cloud (`VECTOR_BACKEND=qdrant`)
+- **Document backup:** optional S3 upload of original files on ingest
 - **Gemini answers:** concise responses grounded in retrieved context
 - **CLI chat:** ask questions in your terminal
-- **Robustness:** prompt budgets + retries + extractive fallback so you always get something
 
 ✨ What This Project Does
 
 Upload documents (.pdf, .txt, .md)
 
-Chunk + embed them locally using Sentence Transformers
+Chunk + embed them with Gemini embeddings
 
 Store vectors in a lightweight NumPy index
 
-Retrieve the most relevant chunks per query
+Retrieve the most relevant chunks per query via cosine similarity
 
 Generate structured, grounded answers using Gemini
 
@@ -59,21 +58,11 @@ Smart chunking (800 chars, 200 overlap)
 
 🔍 Retrieval
 
-Local semantic search using all-MiniLM-L6-v2
-
-No external services required
-
-Transparent chunk retrieval
+Semantic search using Gemini embeddings (or local models) with cosine similarity via the selected vector backend.
 
 🤖 Answer Generation
 
-Gemini 2.5 Flash
-
-Uses only retrieved context
-
-Structured summaries with headings and bullets
-
-Safe fallback behavior
+Gemini 2.5 Flash by default, grounded in retrieved context with concise formatting.
 
 🖥️ UI
 
@@ -100,3 +89,22 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install -r requirements.txt
+export GOOGLE_API_KEY=your_key_here
+```
+
+### Embedding options
+- Default: Gemini embeddings (`EMBED_PROVIDER=gemini`, `GEMINI_EMBED_MODEL=models/embedding-001`), requires `GOOGLE_API_KEY`.
+- Local (no embedding API calls): set `EMBED_PROVIDER=local` and optionally `LOCAL_EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2`. Install the extra deps: `pip install sentence-transformers`.
+
+### Vector store options
+- Local NumPy (default): set `VECTOR_BACKEND=local`. Data lives in `./lite_index`.
+- Qdrant: set `VECTOR_BACKEND=qdrant` and configure:
+  - `QDRANT_URL` (e.g., `https://<cluster>.cloud.qdrant.io:6333`)
+  - `QDRANT_API_KEY`
+  - `QDRANT_COLLECTION` (e.g., `documents`)
+
+### Document storage (optional)
+- To back up uploaded files to S3, set:
+  - `S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+  - Optional `S3_PREFIX` (folder prefix)
+- `UPLOAD_DIR` and `INDEX_DIR` can be overridden via env if you mount a disk.
